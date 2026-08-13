@@ -4,8 +4,8 @@ Decision 100% Utmify; ejecucion en Meta. Regla breakeven sobre el FRONT.
 Secrets requeridos (env): UTMIFY_URL, META_TOKEN."""
 import json, os, urllib.request, urllib.parse, datetime, sys
 
-UTMIFY_URL = os.environ["UTMIFY_URL"].strip()
-TOKEN      = os.environ["META_TOKEN"].strip()
+UTMIFY_URL = os.environ["UTMIFY_URL"].strip().lstrip("﻿").strip()
+TOKEN      = os.environ["META_TOKEN"].strip().lstrip("﻿").strip()
 DASH       = "69cfdbde070cfeea2ad72c39"          # TELAS (ESPANOL) - contiene la cuenta TESTEO
 TS         = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
