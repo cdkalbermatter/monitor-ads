@@ -1,0 +1,25 @@
+name: auto-pausa-ads
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"   # cada 3 horas (UTC)
+  workflow_dispatch: {}      # permite correrlo a mano desde la pestaña Actions
+
+concurrency:
+  group: autopausa
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ejecutar auto-pausa
+        env:
+          UTMIFY_URL: ${{ secrets.UTMIFY_URL }}
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+        run: python autopausa_ci.py
