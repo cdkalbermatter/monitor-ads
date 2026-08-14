@@ -1,37 +1,50 @@
 # -*- coding: utf-8 -*-
-"""Auto-pausa de ads de TESTEO para GitHub Actions (corre 24/7 sin depender de la PC).
-Decision 100% Utmify; ejecucion en Meta. Regla breakeven sobre el FRONT.
-Secrets requeridos (env): UTMIFY_URL, META_TOKEN."""
-import json, os, urllib.request, urllib.parse, datetime, sys
+"""Auto-pausa de ads de TESTEO (24/7). Decision 100% Utmify; ejecucion en Meta.
+Regla breakeven sobre el FRONT, POR ANUNCIO. Descubre las campañas de testeo por NOMBRE
+(no hardcodeadas): "ABO TESTEO"/"TESTEO" activas, mercado por bandera/pais, excluye party-kit.
+Credenciales: env (UTMIFY_URL, META_TOKEN) o, si faltan, archivos locales."""
+import json, os, urllib.request, urllib.parse, datetime
 
-UTMIFY_URL = os.environ["UTMIFY_URL"].strip().lstrip("﻿").strip()
-TOKEN      = os.environ["META_TOKEN"].strip().lstrip("﻿").strip()
-DASH       = "69cfdbde070cfeea2ad72c39"          # TELAS (ESPANOL) - contiene la cuenta TESTEO
-TS         = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+def _cred():
+    u = os.environ.get("UTMIFY_URL")
+    if not u: u = open(r"C:\Users\ckalb\.utmify\mcp_url.txt", encoding="utf-8").read()
+    t = os.environ.get("META_TOKEN")
+    if not t: t = json.load(open(r"C:\Users\ckalb\.meta_ads\credentials.json", encoding="utf-8"))["user_access_token"]
+    return u.strip().lstrip("\ufeff").strip(), t.strip().lstrip("\ufeff").strip()
+UTMIFY_URL, TOKEN = _cred()
+DRY  = os.environ.get("DRY_RUN") == "1"
+DASH = "69cfdbde070cfeea2ad72c39"
+TS   = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-# campaignId -> (mercado, front)
-CAMP = {
- "120253176614960231": ("BR", 14.99),
- "120252574168510231": ("ES", 19.99),
- "120253333066970231": ("EN", 29.00),
- "120253640267520231": ("FR", 19.90),
- "120253672325010231": ("DE", 28.90),
- "120253672337700231": ("IT", 24.90),
-}
-CAMP_IDS = set(CAMP)
+FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90}
 FRONT_NAMES = {"The Ultimate Knitting Library","LA BIBLIOTECA DEFINITIVA DE TEJIDO",
  "A Biblioteca Definitiva do Trico","La Biblioteca Definitiva del Tricot",
  "Die Ultimative Strickbibliothek","La Biblioteca Definitiva della Maglia"}
-MIN_KNITTING = 50
+PARTY = ("KF360","KF 360","FIESTA","FESTA","PARTY","\U0001F389")
 
-def threshold(front, ventas):
-    if ventas == 0: return 0.7 * front
-    if ventas <= 3: return ventas * front
-    return 3 * front + (ventas - 3) * 0.5 * front
+def market(name):
+    n = name or ""; u = n.upper()
+    if "\U0001F7E1\U0001F7E2\U0001F7E1" in n or "BRASIL" in u or "PORTUG" in u: return "BR"
+    if "\U0001F534\U0001F534\U0001F534" in n or "INGLES" in u or "ENGLISH" in u: return "EN"
+    if "\U0001F535\u26AA\U0001F534" in n or "FRANC" in u: return "FR"
+    if "\u26AB\U0001F534\U0001F7E1" in n or "ALEMAN" in u or "GERMAN" in u: return "DE"
+    if "\U0001F7E2\u26AA\U0001F534" in n or "ITALIA" in u: return "IT"
+    if "\U0001F534\U0001F7E1\U0001F534" in n or "ESPA\u00d1OL" in u or "[ESP" in u or "CHILE" in u: return "ES"
+    return None
 
-def _one_pull(order):
+def is_testeo(name):
+    u = (name or "").upper()
+    if any(p in name.upper() for p in PARTY): return False
+    return "ABO TESTEO" in u or "TESTEO" in u
+
+def threshold(front, v):
+    if v == 0: return 0.7*front
+    if v <= 3: return v*front
+    return 3*front + (v-3)*0.5*front
+
+def _pull(level):
     body = json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
-        "name":"get_meta_ad_objects","arguments":{"dashboardId":DASH,"level":"ad","orderBy":order,"limit":500}}}).encode()
+        "name":"get_meta_ad_objects","arguments":{"dashboardId":DASH,"level":level,"orderBy":"greater_loss","limit":600}}}).encode()
     H = {"Content-Type":"application/json","Accept":"application/json, text/event-stream",
          "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0 Safari/537.36"}
     raw = urllib.request.urlopen(urllib.request.Request(UTMIFY_URL,data=body,headers=H),timeout=250).read().decode()
@@ -40,43 +53,51 @@ def _one_pull(order):
             if ln.startswith("data:"): raw = ln[5:].strip(); break
     return json.loads(json.loads(raw)["result"]["content"][0]["text"]).get("results",[])
 
-def utmify(order):
+def pull(level, minrows):
     last = []
-    for intento in range(5):
-        try:
-            r = _one_pull(order)
-        except Exception as e:
-            print("pull intento %d fallo: %s" % (intento+1, str(e)[:120])); continue
-        kn = sum(1 for a in r if a.get("campaignId") in CAMP_IDS)
-        if kn >= MIN_KNITTING:
-            return r
-        print("pull intento %d incompleto: total=%d knitting=%d" % (intento+1, len(r), kn)); last = r
-    raise RuntimeError("Utmify no devolvio universo plausible tras 5 intentos. NO se pausa nada.")
+    for i in range(5):
+        try: r = _pull(level)
+        except Exception as e: print("pull %s intento %d fallo: %s"%(level,i+1,str(e)[:100])); continue
+        if len(r) >= minrows: return r
+        print("pull %s intento %d incompleto: %d filas"%(level,i+1,len(r))); last = r
+    raise RuntimeError("Utmify no devolvio universo plausible (%s). NO se pausa nada."%level)
 
 def meta_pause(ad_id):
     data = urllib.parse.urlencode({"status":"PAUSED","access_token":TOKEN}).encode()
     urllib.request.urlopen(urllib.request.Request(
-        "https://graph.facebook.com/v21.0/%s" % ad_id, data=data), timeout=30).read()
+        "https://graph.facebook.com/v21.0/%s"%ad_id, data=data), timeout=30).read()
 
 def main():
-    ads = {a["id"]: a for a in utmify("greater_loss")}.values()
+    # 1) DESCUBRIR campañas de testeo activas por nombre -> {campaignId: (mercado, front)}
+    camps = pull("campaign", 50)
+    scope = {}
+    for c in camps:
+        nm = c.get("name","") or ""
+        if c.get("status") == "ACTIVE" and is_testeo(nm):
+            mk = market(nm)
+            if mk in FRONTS: scope[c.get("id")] = (mk, FRONTS[mk])
+    print("%s | campañas de testeo activas: %d"%(TS, len(scope)))
+    if not scope:
+        print("no hay campañas de testeo activas."); return
+    # 2) ads -> pausar POR ANUNCIO el que cruzo su breakeven
+    ads = {a["id"]: a for a in pull("ad", 100)}.values()
     paused = []
     for a in ads:
         cid = a.get("campaignId")
-        if cid not in CAMP or a.get("status") != "ACTIVE": continue
-        mkt, front = CAMP[cid]
-        sp = (a.get("spend") or 0) / 100.0
+        if cid not in scope or a.get("status") != "ACTIVE": continue
+        mkt, front = scope[cid]
+        sp = (a.get("spend") or 0)/100.0
         fs = sum(p.get("approvedOrdersCount",0) for p in (a.get("approvedOrdersByProductId") or {}).values()
                  if p.get("name") in FRONT_NAMES)
         if sp < threshold(front, fs): continue
         try:
-            meta_pause(a["id"])
+            if not DRY: meta_pause(a["id"])
             paused.append((mkt, a.get("name"), round(sp,2), fs, round(threshold(front,fs),2)))
         except Exception as e:
-            print("ERROR pausando %s: %s" % (a.get("name"), str(e)[:120]))
-    print("%s | apagados=%d" % (TS, len(paused)))
+            print("ERROR pausando %s: %s"%(a.get("name"), str(e)[:100]))
+    print("%s | %s=%d"%(TS, "SE PAUSARIAN" if DRY else "apagados", len(paused)))
     for mkt,name,sp,fs,g in sorted(paused, key=lambda x:-x[2]):
-        print("  PAUSED %-3s %-16s $%6.2f %dv (gate $%.2f)" % (mkt,name,sp,fs,g))
+        print("  PAUSED %-3s %-18s $%6.2f %dv (gate $%.2f)"%(mkt,name,sp,fs,g))
 
 if __name__ == "__main__":
     main()
