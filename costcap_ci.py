@@ -59,50 +59,67 @@ def meta_pause(adset_id):
         "https://graph.facebook.com/v21.0/%s"%adset_id, data=data), timeout=30).read()
 
 def main():
-    # 1) campañas cost-cap TELAS ACTIVAS -> {campaignId: (market, front, nombre)}
+    from collections import defaultdict
+    # 1) descubrir por nombre: COST-CAP (se cortan a nivel CONJUNTO) y AISLADAS (a nivel CAMPAÑA)
     camps = pull("campaign", 50)
-    scope = {}
+    scope_cc = {}   # cost-cap  -> corte por adset
+    scope_ais = {}  # aisladas  -> corte por campaña
     PARTY = ("KF360","FIESTA","FESTA","PARTY","KIT 360","🎉","KF 360")
     for c in camps:
-        nm = c.get("name","") or ""
-        nmu = nm.upper()
-        is_scope   = ("COSTCAP" in nmu.replace(" ","")) or ("AISLADA" in nmu)  # cost-cap Y aisladas
-        is_party   = any(p in nmu for p in PARTY)              # excluir party-kit
-        if is_scope and not is_party and c.get("status") == "ACTIVE":
-            mk = market(nm)   # tejido = tiene pais reconocido (ya no depende de "TELAS")
-            if mk in FRONTS:
-                scope[c.get("id")] = (mk, FRONTS[mk], nm)
-    print("%s | cost-cap + aisladas activas: %d"%(TS, len(scope)))
-    if not scope:
-        print("no hay cost-cap/aisladas activas. nada que hacer."); return
+        nm = c.get("name","") or ""; nmu = nm.upper()
+        if any(p in nmu for p in PARTY) or c.get("status") != "ACTIVE": continue
+        mk = market(nm)
+        if mk not in FRONTS: continue
+        if "AISLADA" in nmu: scope_ais[c.get("id")] = (mk, FRONTS[mk], nm)
+        elif "COSTCAP" in nmu.replace(" ",""): scope_cc[c.get("id")] = (mk, FRONTS[mk], nm)
+    print("%s | cost-cap: %d | aisladas: %d"%(TS, len(scope_cc), len(scope_ais)))
+    if not scope_cc and not scope_ais:
+        print("nada activo."); return
 
-    # 2) NIVEL CONJUNTO directo (nunca agregar desde ads: el status del ad miente)
     adsets = pull("adset", 300)
+    def front_sales(a):
+        return sum(p.get("approvedOrdersCount",0) for p in (a.get("approvedOrdersByProductId") or {}).values()
+                   if p.get("name") in FRONT_NAMES)
     paused, informar = [], []
+
+    # 2a) COST-CAP: nivel CONJUNTO (solo conjuntos ACTIVE)
     for a in adsets:
         cid = a.get("campaignId")
-        if cid not in scope: continue
-        if a.get("status") != "ACTIVE": continue          # estado REAL del conjunto
-        mk, front, cname = scope[cid]
-        sp = (a.get("spend") or 0)/100.0
-        fs = sum(p.get("approvedOrdersCount",0) for p in (a.get("approvedOrdersByProductId") or {}).values()
-                 if p.get("name") in FRONT_NAMES)
+        if cid not in scope_cc or a.get("status") != "ACTIVE": continue
+        mk, front, cname = scope_cc[cid]
+        sp = (a.get("spend") or 0)/100.0; fs = front_sales(a)
         if fs >= 6:
-            informar.append((mk, a.get("id"), sp, fs, cname)); continue   # 6+ ventas -> decide el cliente
+            informar.append((mk,"adset",a.get("id"),sp,fs,cname)); continue
         if sp >= threshold(front, fs):
-            gate = threshold(front, fs)
             if not DRY:
                 try: meta_pause(a.get("id"))
                 except Exception as e: print("ERROR pausando adset %s: %s"%(a.get("id"),str(e)[:80])); continue
-            paused.append((mk, a.get("id"), sp, fs, round(gate,2), cname))
+            paused.append((mk,"adset",a.get("id"),sp,fs,round(threshold(front,fs),2),cname))
 
-    print("%s CONJUNTOS %s (%d):"%("[DRY] " if DRY else "", "que se pausarian" if DRY else "PAUSADOS", len(paused)))
-    for mk,asid,sp,fs,gate,cn in sorted(paused, key=lambda x:-x[2]):
-        print("   %-3s adset %s  $%7.2f  %dv  (gate $%.2f)  | %s"%(mk,asid,sp,fs,gate,cn[:40]))
+    # 2b) AISLADAS: nivel CAMPAÑA (agregar TODOS los conjuntos de la campaña -> pausar la CAMPAÑA)
+    agg = defaultdict(lambda:{"sp":0.0,"fs":0})
+    for a in adsets:
+        cid = a.get("campaignId")
+        if cid not in scope_ais: continue
+        g = agg[cid]; g["sp"] += (a.get("spend") or 0)/100.0; g["fs"] += front_sales(a)
+    for cid, g in agg.items():
+        mk, front, cname = scope_ais[cid]
+        sp, fs = g["sp"], g["fs"]
+        if fs >= 6:
+            informar.append((mk,"CAMP",cid,sp,fs,cname)); continue
+        if sp >= threshold(front, fs):
+            if not DRY:
+                try: meta_pause(cid)              # pausa la CAMPAÑA entera
+                except Exception as e: print("ERROR pausando campaña %s: %s"%(cid,str(e)[:80])); continue
+            paused.append((mk,"CAMP",cid,sp,fs,round(threshold(front,fs),2),cname))
+
+    print("%s %s (%d):"%("[DRY] " if DRY else "", "SE PAUSARIAN" if DRY else "PAUSADOS", len(paused)))
+    for mk,lvl,oid,sp,fs,gate,cn in sorted(paused, key=lambda x:-x[3]):
+        print("   %-3s %-5s %s  $%7.2f  %dv  (gate $%.2f)  | %s"%(mk,lvl,oid,sp,fs,gate,cn[:38]))
     if informar:
         print(">> con 6+ ventas (NO se tocan, decidis vos): %d"%len(informar))
-        for mk,asid,sp,fs,cn in sorted(informar,key=lambda x:-x[2])[:10]:
-            print("   %-3s adset %s  $%7.2f  %dv  | %s"%(mk,asid,sp,fs,cn[:40]))
+        for mk,lvl,oid,sp,fs,cn in sorted(informar,key=lambda x:-x[3])[:10]:
+            print("   %-3s %-5s %s  $%7.2f  %dv  | %s"%(mk,lvl,oid,sp,fs,cn[:38]))
 
 if __name__ == "__main__":
     main()
