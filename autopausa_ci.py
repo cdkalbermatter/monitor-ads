@@ -53,14 +53,15 @@ def _pull(level):
             if ln.startswith("data:"): raw = ln[5:].strip(); break
     return json.loads(json.loads(raw)["result"]["content"][0]["text"]).get("results",[])
 
+class UtmifyEmpty(Exception): pass
+
 def pull(level, minrows):
-    last = []
-    for i in range(5):
+    for i in range(8):
         try: r = _pull(level)
         except Exception as e: print("pull %s intento %d fallo: %s"%(level,i+1,str(e)[:100])); continue
         if len(r) >= minrows: return r
-        print("pull %s intento %d incompleto: %d filas"%(level,i+1,len(r))); last = r
-    raise RuntimeError("Utmify no devolvio universo plausible (%s). NO se pausa nada."%level)
+        print("pull %s intento %d incompleto: %d filas"%(level,i+1,len(r)))
+    raise UtmifyEmpty("Utmify no devolvio universo plausible (%s). NO se pausa nada (salida limpia)."%level)
 
 def meta_pause(ad_id):
     data = urllib.parse.urlencode({"status":"PAUSED","access_token":TOKEN}).encode()
@@ -100,4 +101,7 @@ def main():
         print("  PAUSED %-3s %-18s $%6.2f %dv (gate $%.2f)"%(mkt,name,sp,fs,g))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except UtmifyEmpty as e:
+        print(e)   # salida limpia (exit 0): la intermitencia de Utmify no es un fallo real

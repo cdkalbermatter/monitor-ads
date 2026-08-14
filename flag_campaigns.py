@@ -36,6 +36,8 @@ def newname(name):
     base=re.sub(r'\s{2,}',' ',base).strip()
     return FLAG[mk]+base
 
+class UtmifyEmpty(Exception): pass
+
 def pull_campaigns():
     r=[]
     for _ in range(8):
@@ -47,7 +49,7 @@ def pull_campaigns():
                 if ln.startswith("data:"): raw=ln[5:].strip();break
         r=json.loads(json.loads(raw)["result"]["content"][0]["text"]).get("results",[])
         if len(r)>=50: return r
-    raise RuntimeError("Utmify no devolvio campañas. Nada que hacer.")
+    raise UtmifyEmpty("Utmify no devolvio campañas. Nada que hacer (salida limpia).")
 
 def rename(cid, name):
     data=urllib.parse.urlencode({"name":name,"access_token":TOKEN}).encode("utf-8")
@@ -69,4 +71,7 @@ def main():
     print("%s %d campañas activas de tejido"%("[DRY] a renombrar:" if DRY else "RENOMBRADAS:", done))
 
 if __name__=="__main__":
-    main()
+    try:
+        main()
+    except UtmifyEmpty as e:
+        print(e)   # salida limpia (exit 0)

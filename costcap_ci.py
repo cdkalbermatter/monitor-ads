@@ -45,13 +45,15 @@ def _pull(level):
             if ln.startswith("data:"): raw = ln[5:].strip(); break
     return json.loads(json.loads(raw)["result"]["content"][0]["text"]).get("results",[])
 
+class UtmifyEmpty(Exception): pass
+
 def pull(level, minrows):
-    for _ in range(6):
+    for _ in range(8):
         try: r = _pull(level)
         except Exception as e: print("pull %s fallo: %s"%(level,str(e)[:80])); continue
         if len(r) >= minrows: return r
         print("pull %s incompleto: %d filas"%(level,len(r)))
-    raise RuntimeError("Utmify no devolvio universo plausible (%s). NO se toca nada."%level)
+    raise UtmifyEmpty("Utmify no devolvio universo plausible (%s). NO se toca nada (salida limpia)."%level)
 
 def meta_pause(adset_id):
     data = urllib.parse.urlencode({"status":"PAUSED","access_token":TOKEN}).encode()
@@ -122,4 +124,7 @@ def main():
             print("   %-3s %-5s %s  $%7.2f  %dv  | %s"%(mk,lvl,oid,sp,fs,cn[:38]))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except UtmifyEmpty as e:
+        print(e)   # salida limpia (exit 0)
