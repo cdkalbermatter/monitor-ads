@@ -1,0 +1,25 @@
+name: auto-pausa-costcap
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 min (UTC) — GitHub puede atrasar en horas pico
+  workflow_dispatch: {}
+
+concurrency:
+  group: costcap
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ejecutar auto-pausa cost-cap (nivel conjunto)
+        env:
+          UTMIFY_URL: ${{ secrets.UTMIFY_URL }}
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+        run: python costcap_ci.py
