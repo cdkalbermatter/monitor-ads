@@ -2,7 +2,7 @@ name: auto-pausa-costcap
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # cada 30 min (UTC) — GitHub puede atrasar en horas pico
+    - cron: "*/15 * * * *"   # cada 15 min (UTC) — GitHub puede atrasar; a 15 min queda cobertura ~30 min aun con atrasos
   workflow_dispatch: {}
 
 concurrency:

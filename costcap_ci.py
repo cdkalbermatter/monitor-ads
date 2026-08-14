@@ -19,8 +19,13 @@ FRONT_NAMES = {"The Ultimate Knitting Library","LA BIBLIOTECA DEFINITIVA DE TEJI
 
 def market(name):
     n = (name or "").upper()
-    for k,m in [("INGLES","EN"),("PORTUG","BR"),("BRASIL","BR"),("ESPAÑOL","ES"),("[ESP","ES"),
-                ("CHILE","ES"),("FRANC","FR"),("ALEMAN","DE"),("ITALIA","IT")]:
+    # orden: mas especifico primero. Cubre nombres largos (ES/PT) y codigos cortos entre corchetes.
+    for k,m in [("INGLES","EN"),("INGLÊS","EN"),("ENGLISH","EN"),("[EN]","EN"),("[UK]","EN"),("[US]","EN"),
+                ("PORTUG","BR"),("BRASIL","BR"),("[BR]","BR"),("[PT]","BR"),
+                ("ESPAÑOL","ES"),("ESPANOL","ES"),("[ESP","ES"),("[ES]","ES"),("CHILE","ES"),("MEXICO","ES"),
+                ("FRANC","FR"),("[FR]","FR"),
+                ("ALEMAN","DE"),("ALEMÁN","DE"),("GERMAN","DE"),("[DE]","DE"),
+                ("ITALIA","IT"),("ITALIAN","IT"),("[IT]","IT")]:
         if k in n: return m
     return None
 
