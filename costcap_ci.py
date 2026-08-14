@@ -66,15 +66,15 @@ def main():
     for c in camps:
         nm = c.get("name","") or ""
         nmu = nm.upper()
-        is_costcap = "COSTCAP" in nmu.replace(" ","")          # agarra "COST CAP" y "COSTCAP"
+        is_scope   = ("COSTCAP" in nmu.replace(" ","")) or ("AISLADA" in nmu)  # cost-cap Y aisladas
         is_party   = any(p in nmu for p in PARTY)              # excluir party-kit
-        if is_costcap and not is_party and c.get("status") == "ACTIVE":
+        if is_scope and not is_party and c.get("status") == "ACTIVE":
             mk = market(nm)   # tejido = tiene pais reconocido (ya no depende de "TELAS")
             if mk in FRONTS:
                 scope[c.get("id")] = (mk, FRONTS[mk], nm)
-    print("%s | cost-cap TELAS activas: %d"%(TS, len(scope)))
+    print("%s | cost-cap + aisladas activas: %d"%(TS, len(scope)))
     if not scope:
-        print("no hay cost-cap activas. nada que hacer."); return
+        print("no hay cost-cap/aisladas activas. nada que hacer."); return
 
     # 2) NIVEL CONJUNTO directo (nunca agregar desde ads: el status del ad miente)
     adsets = pull("adset", 300)
