@@ -62,10 +62,14 @@ def main():
     # 1) campañas cost-cap TELAS ACTIVAS -> {campaignId: (market, front, nombre)}
     camps = pull("campaign", 50)
     scope = {}
+    PARTY = ("KF360","FIESTA","FESTA","PARTY","KIT 360","🎉","KF 360")
     for c in camps:
         nm = c.get("name","") or ""
-        if "COST CAP" in nm.upper() and "TELAS" in nm.upper() and c.get("status") == "ACTIVE":
-            mk = market(nm)
+        nmu = nm.upper()
+        is_costcap = "COSTCAP" in nmu.replace(" ","")          # agarra "COST CAP" y "COSTCAP"
+        is_party   = any(p in nmu for p in PARTY)              # excluir party-kit
+        if is_costcap and not is_party and c.get("status") == "ACTIVE":
+            mk = market(nm)   # tejido = tiene pais reconocido (ya no depende de "TELAS")
             if mk in FRONTS:
                 scope[c.get("id")] = (mk, FRONTS[mk], nm)
     print("%s | cost-cap TELAS activas: %d"%(TS, len(scope)))
