@@ -2,24 +2,26 @@ name: auto-pausa-costcap
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # cada 15 min (UTC) — GitHub puede atrasar; a 15 min queda cobertura ~30 min aun con atrasos
+    - cron: "*/15 * * * *"   # intenta relanzar seguido; el loop interno cubre los atrasos del cron
   workflow_dispatch: {}
 
+# Un solo loop vivo a la vez; cuando el cron logra dispararse, reinicia con codigo fresco (sin backlog).
 concurrency:
-  group: costcap
-  cancel-in-progress: false
+  group: costcap-live
+  cancel-in-progress: true
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 115
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Ejecutar auto-pausa cost-cap (nivel conjunto)
+      - name: Monitor cost-cap/aisladas EN VIVO (gasto Meta ~60s, ventas Utmify)
         env:
           UTMIFY_URL: ${{ secrets.UTMIFY_URL }}
           META_TOKEN: ${{ secrets.META_TOKEN }}
-        run: python costcap_ci.py
+          LOOP_MIN: "110"
+        run: python costcap_live.py
