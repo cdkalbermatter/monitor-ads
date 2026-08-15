@@ -3,7 +3,9 @@
 Regla breakeven sobre el FRONT, POR ANUNCIO. Descubre las campañas de testeo por NOMBRE
 (no hardcodeadas): "ABO TESTEO"/"TESTEO" activas, mercado por bandera/pais, excluye party-kit.
 Credenciales: env (UTMIFY_URL, META_TOKEN) o, si faltan, archivos locales."""
-import json, os, urllib.request, urllib.parse, datetime
+import json, os, sys, urllib.request, urllib.parse, datetime
+try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # nunca crashear por emojis
+except Exception: pass
 
 def _cred():
     u = os.environ.get("UTMIFY_URL")
@@ -41,6 +43,21 @@ def threshold(front, v):
     if v == 0: return 0.7*front
     if v <= 3: return v*front
     return 3*front + (v-3)*0.5*front
+
+def num(x):
+    try: return float(x or 0)
+    except: return 0.0
+
+def sales_count(o):
+    # ordenes aprobadas AUTORITATIVAS (front+upsells) del propio objeto; mas confiable que
+    # sumar approvedOrdersByProductId (Utmify atribuye tarde -> subconteo -> pausaba ganadores)
+    return int(o.get("approvedOrdersCount") or 0)
+
+def hidden_sales(o):
+    return sales_count(o)==0 and (num(o.get("revenue"))>0 or num(o.get("grossRevenue"))>0 or int(o.get("totalOrdersCount") or 0)>0)
+
+def is_profitable(o):
+    return num(o.get("profit")) > 0
 
 def _pull(level):
     body = json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
@@ -88,12 +105,13 @@ def main():
         if cid not in scope or a.get("status") != "ACTIVE": continue
         mkt, front = scope[cid]
         sp = (a.get("spend") or 0)/100.0
-        fs = sum(p.get("approvedOrdersCount",0) for p in (a.get("approvedOrdersByProductId") or {}).values()
-                 if p.get("name") in FRONT_NAMES)
-        if sp < threshold(front, fs): continue
+        n  = sales_count(a)
+        if hidden_sales(a): continue          # glitch Utmify: gasto sin ventas -> no tocar
+        if is_profitable(a): continue         # rentable ahora -> JAMAS pausar
+        if sp < threshold(front, n): continue
         try:
             if not DRY: meta_pause(a["id"])
-            paused.append((mkt, a.get("name"), round(sp,2), fs, round(threshold(front,fs),2)))
+            paused.append((mkt, a.get("name"), round(sp,2), n, round(threshold(front,n),2)))
         except Exception as e:
             print("ERROR pausando %s: %s"%(a.get("name"), str(e)[:100]))
     print("%s | %s=%d"%(TS, "SE PAUSARIAN" if DRY else "apagados", len(paused)))

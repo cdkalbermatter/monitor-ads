@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Renombra campañas activas de TEJIDO: antepone bandera de color, saca 🧶 y la palabra TELAS.
 Deja el nombre del país (el detector sigue leyendolo). DRY_RUN=1 = solo muestra."""
-import json, os, re, urllib.request, urllib.parse
+import json, os, re, sys, urllib.request, urllib.parse
+try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception: pass
 
 UTMIFY_URL = os.environ["UTMIFY_URL"].strip().lstrip("﻿").strip()
 TOKEN      = os.environ["META_TOKEN"].strip().lstrip("﻿").strip()
