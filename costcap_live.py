@@ -28,7 +28,7 @@ DASH    = "69cfdbde070cfeea2ad72c39"
 ACCOUNTS = ["act_1225802776185769", "act_884311447637492"]  # MANUALBIDDING(cost-cap) + AUTOBIDDING(aisladas)
 LOOP_MIN     = int(os.environ.get("LOOP_MIN", "55"))
 SPEND_EVERY  = 120    # s: poll de gasto Meta (subido de 60 para no reventar el token)
-SCOPE_EVERY  = 600    # s: refresco de ventas Utmify (subido de 300, sales no cambia tan rapido)
+SCOPE_EVERY  = 900    # s: refresco ventas Utmify cada 15 min (bien gentil, evita rate-limit)
 
 FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90}
 PARTY  = ("KF360","KF 360","FIESTA","FESTA","PARTY","KIT 360","\U0001F389")
