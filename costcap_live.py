@@ -27,8 +27,8 @@ ONESHOT = os.environ.get("ONESHOT") == "1"
 DASH    = "69cfdbde070cfeea2ad72c39"
 ACCOUNTS = ["act_1225802776185769", "act_884311447637492"]  # MANUALBIDDING(cost-cap) + AUTOBIDDING(aisladas)
 LOOP_MIN     = int(os.environ.get("LOOP_MIN", "55"))
-SPEND_EVERY  = 60     # s: poll de gasto Meta
-SCOPE_EVERY  = 300    # s: refresco de ventas Utmify
+SPEND_EVERY  = 120    # s: poll de gasto Meta (subido de 60 para no reventar el token)
+SCOPE_EVERY  = 600    # s: refresco de ventas Utmify (subido de 300, sales no cambia tan rapido)
 
 FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90}
 PARTY  = ("KF360","KF 360","FIESTA","FESTA","PARTY","KIT 360","\U0001F389")
@@ -70,10 +70,14 @@ def _utm(level):
     return json.loads(json.loads(raw)["result"]["content"][0]["text"]).get("results",[])
 
 def utm_pull(level, minrows):
-    for _ in range(8):
+    for i in range(4):
         try: r = _utm(level)
-        except Exception as e: print("utmify %s fallo: %s"%(level,str(e)[:80])); continue
+        except Exception as e:
+            print("utmify %s fallo: %s"%(level,str(e)[:80]))
+            if i < 3: time.sleep(25)   # ESPERA entre reintentos: no martillar (evita rate-limit)
+            continue
         if len(r) >= minrows: return r
+        if i < 3: time.sleep(25)
     raise UtmifyEmpty("Utmify sin universo plausible (%s)"%level)
 
 def meta_spend():

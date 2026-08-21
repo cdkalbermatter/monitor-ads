@@ -3,7 +3,7 @@
 Regla breakeven sobre el FRONT, POR ANUNCIO. Descubre las campañas de testeo por NOMBRE
 (no hardcodeadas): "ABO TESTEO"/"TESTEO" activas, mercado por bandera/pais, excluye party-kit.
 Credenciales: env (UTMIFY_URL, META_TOKEN) o, si faltan, archivos locales."""
-import json, os, sys, urllib.request, urllib.parse, datetime
+import json, time, os, sys, urllib.request, urllib.parse, datetime
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # nunca crashear por emojis
 except Exception: pass
 
@@ -73,11 +73,15 @@ def _pull(level):
 class UtmifyEmpty(Exception): pass
 
 def pull(level, minrows):
-    for i in range(8):
+    for i in range(4):
         try: r = _pull(level)
-        except Exception as e: print("pull %s intento %d fallo: %s"%(level,i+1,str(e)[:100])); continue
+        except Exception as e:
+            print("pull %s intento %d fallo: %s"%(level,i+1,str(e)[:100]))
+            if i < 3: time.sleep(25)   # ESPERA entre reintentos (evita rate-limit)
+            continue
         if len(r) >= minrows: return r
         print("pull %s intento %d incompleto: %d filas"%(level,i+1,len(r)))
+        if i < 3: time.sleep(25)
     raise UtmifyEmpty("Utmify no devolvio universo plausible (%s). NO se pausa nada (salida limpia)."%level)
 
 def meta_pause(ad_id):
