@@ -4,6 +4,7 @@ Regla breakeven sobre el FRONT, POR ANUNCIO. Descubre las campañas de testeo po
 (no hardcodeadas): "ABO TESTEO"/"TESTEO" activas, mercado por bandera/pais, excluye party-kit.
 Credenciales: env (UTMIFY_URL, META_TOKEN) o, si faltan, archivos locales."""
 import json, time, os, sys, urllib.request, urllib.parse, datetime
+import time
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # nunca crashear por emojis
 except Exception: pass
 
