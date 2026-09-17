@@ -18,11 +18,13 @@ UTMIFY_URL, TOKEN = _cred()
 DRY  = os.environ.get("DRY_RUN") == "1"
 DASH = "69cfdbde070cfeea2ad72c39"      # TELAS (tejido)
 DASH_GA = "6a3efe2e78421ff586fc4853"   # GeriActiva (comun LATAM, Argentina, Cognitiva, GeriActive EN)
+DASH_ZP = "6aaa84b404e276a6cd132545"   # Zentro (Pilates)
 TS   = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
 FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90}
 # Fronts GeriActiva (USD, verificados 17/09/2026 con landing en vivo + revenue/orden de Utmify)
 FRONTS_GA = {"GA-COG":18.00, "GA-EN":27.00, "GA-AR":16.99, "GA-ES":16.99}
+FRONTS_ZP = {"ZENTRO":27.00}   # landing zentropilates US$27 (17/09/2026)
 FRONT_NAMES = {"The Ultimate Knitting Library","LA BIBLIOTECA DEFINITIVA DE TEJIDO",
  "A Biblioteca Definitiva do Trico","La Biblioteca Definitiva del Tricot",
  "Die Ultimative Strickbibliothek","La Biblioteca Definitiva della Maglia"}
@@ -46,6 +48,9 @@ def market_ga(name):
     if "\U0001F534\U0001F534\U0001F534" in n or "[INGLES]" in u or "ENGLISH" in u: return "GA-EN"
     if "\U0001F534\U0001F7E1\U0001F534" in n or "ESPAÑOL" in u: return "GA-ES"
     return None   # IT/DE/FR u otros: sin front verificado -> no se tocan
+
+def market_zp(name):
+    return "ZENTRO" if "ZENTRO" in (name or "").upper() or "PILATES" in (name or "").upper() else None
 
 def is_testeo(name):
     u = (name or "").upper()
@@ -110,7 +115,8 @@ def main():
     total = []
     for label, dash, resolver, fronts, mincamp, minads in (
             ("TELAS", DASH, market, FRONTS, 50, 30),
-            ("GERIACTIVA", DASH_GA, market_ga, FRONTS_GA, 10, 30)):
+            ("GERIACTIVA", DASH_GA, market_ga, FRONTS_GA, 10, 30),
+            ("ZENTRO", DASH_ZP, market_zp, FRONTS_ZP, 1, 1)):
         # TELAS a nivel ad: sin nameContains Utmify devuelve error/vacio -> pedir por prefijos de nombre y unir
         adfilter = ([{"adObjectStatuses":["ACTIVE"],"nameContains":"AD TELAS"},{"adObjectStatuses":["ACTIVE"],"nameContains":"AD IMG"}]
                     if label == "TELAS" else [{"adObjectStatuses":["ACTIVE"]}])
