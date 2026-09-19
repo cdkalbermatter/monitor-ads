@@ -15,7 +15,16 @@ def _cred():
     if not t: t = json.load(open(r"C:\Users\ckalb\.meta_ads\credentials.json", encoding="utf-8"))["user_access_token"]
     return u.strip().lstrip("\ufeff").strip(), t.strip().lstrip("\ufeff").strip()
 UTMIFY_URL, TOKEN = _cred()
-DRY  = os.environ.get("DRY_RUN") == "1"
+# Token de SYSTEM USER (no vence nunca). Se prueba PRIMERO; si Meta lo rechaza (ej. cuenta Zentro, que esta en
+# otro BM sin el system user), cae al user token. Asi tejido/GeriActiva no dependen de renovar nada.
+def _cred_sys():
+    t = os.environ.get("META_TOKEN_SYS")
+    if not t:
+        try: t = json.load(open(r"C:\Users\ckalb\.meta_ads\credentials.json", encoding="utf-8"))["access_token"]
+        except Exception: t = ""
+    return (t or "").strip().lstrip("\ufeff").strip()
+TOKEN_SYS = _cred_sys()
+DRY  =os.environ.get("DRY_RUN") == "1"
 DASH = "69cfdbde070cfeea2ad72c39"      # TELAS (tejido)
 DASH_GA = "6a3efe2e78421ff586fc4853"   # GeriActiva (comun LATAM, Argentina, Cognitiva, GeriActive EN)
 DASH_ZP = "6aaa84b404e276a6cd132545"   # Zentro (Pilates)
@@ -108,9 +117,16 @@ def pull(level, minrows, dash=DASH, extra=None):
     raise UtmifyEmpty("Utmify no devolvio universo plausible (%s). NO se pausa nada (salida limpia)."%level)
 
 def meta_pause(ad_id):
-    data = urllib.parse.urlencode({"status":"PAUSED","access_token":TOKEN}).encode()
-    urllib.request.urlopen(urllib.request.Request(
-        "https://graph.facebook.com/v21.0/%s"%ad_id, data=data), timeout=30).read()
+    last = None
+    for tok in [t for t in (TOKEN_SYS, TOKEN) if t]:
+        try:
+            data = urllib.parse.urlencode({"status":"PAUSED","access_token":tok}).encode()
+            urllib.request.urlopen(urllib.request.Request(
+                "https://graph.facebook.com/v21.0/%s"%ad_id, data=data), timeout=30).read()
+            return
+        except Exception as e:
+            last = e   # sin permiso en esa cuenta: probar con el siguiente token
+    raise last
 
 def main():
     # Tejido (TELAS) + GeriActiva (comun LATAM, Argentina, Cognitiva, EN). Cada tablero por separado:

@@ -1,0 +1,24 @@
+name: keepalive
+
+# GitHub desactiva los crons si el repo pasa 60 dias sin actividad.
+# Esto deja una marca el dia 1 de cada mes para que auto-pausa-ads nunca se apague.
+on:
+  schedule:
+    - cron: "0 12 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          date -u +"%Y-%m-%d %H:%M UTC" > .keepalive
+          git config user.name "cdkalbermatter"
+          git config user.email "kalbermattercristian@gmail.com"
+          git add .keepalive
+          git commit -m "keepalive mensual" || echo "sin cambios"
+          git push

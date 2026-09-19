@@ -22,4 +22,5 @@ jobs:
         env:
           UTMIFY_URL: ${{ secrets.UTMIFY_URL }}
           META_TOKEN: ${{ secrets.META_TOKEN }}
+          META_TOKEN_SYS: ${{ secrets.META_TOKEN_SYS }}
         run: python autopausa_ci.py
