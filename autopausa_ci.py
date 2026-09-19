@@ -25,6 +25,9 @@ FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90
 # Fronts GeriActiva (USD, verificados 17/09/2026 con landing en vivo + revenue/orden de Utmify)
 FRONTS_GA = {"GA-COG":18.00, "GA-EN":27.00, "GA-AR":16.99, "GA-ES":16.99}
 FRONTS_ZP = {"ZENTRO":19.00}   # landing zentropilates US$19 (bajado de $27 el 18/09/2026)
+# Zentro: el cliente bajo el precio $27->$19 el 18/09 y pidio evaluar SOLO la data desde el 19/09 00:00 (AR),
+# "como si empezara de cero". Antes de esa fecha no se toca Zentro. SOLO Zentro; el resto sigue con su historial completo.
+ZP_DESDE = datetime.datetime(2026, 9, 19, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=-3)))
 FRONT_NAMES = {"The Ultimate Knitting Library","LA BIBLIOTECA DEFINITIVA DE TEJIDO",
  "A Biblioteca Definitiva do Trico","La Biblioteca Definitiva del Tricot",
  "Die Ultimative Strickbibliothek","La Biblioteca Definitiva della Maglia"}
@@ -120,6 +123,14 @@ def main():
         # TELAS a nivel ad: sin nameContains Utmify devuelve error/vacio -> pedir por prefijos de nombre y unir
         adfilter = ([{"adObjectStatuses":["ACTIVE"],"nameContains":"AD TELAS"},{"adObjectStatuses":["ACTIVE"],"nameContains":"AD IMG"}]
                     if label == "TELAS" else [{"adObjectStatuses":["ACTIVE"]}])
+        if label == "ZENTRO":
+            ar = datetime.timezone(datetime.timedelta(hours=-3))
+            ahora = datetime.datetime.now(ar)
+            if ahora < ZP_DESDE:
+                print("%s | ZENTRO | en espera: se evalua solo data desde %s (precio nuevo $19)"%(TS, ZP_DESDE.isoformat()))
+                continue
+            rango = {"from": ZP_DESDE.strftime("%Y-%m-%dT%H:%M:%S-03:00"), "to": ahora.strftime("%Y-%m-%dT23:59:59-03:00")}
+            adfilter = [{"adObjectStatuses":["ACTIVE"], "dateRange": rango}]
         try:
             total += run_dash(label, dash, resolver, fronts, mincamp, minads, adfilter)
         except UtmifyEmpty as e:
