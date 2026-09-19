@@ -24,7 +24,7 @@ TS   = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 FRONTS = {"EN":29.00, "ES":19.99, "BR":14.99, "FR":19.90, "DE":28.90, "IT":24.90}
 # Fronts GeriActiva (USD, verificados 17/09/2026 con landing en vivo + revenue/orden de Utmify)
 FRONTS_GA = {"GA-COG":18.00, "GA-EN":27.00, "GA-AR":16.99, "GA-ES":16.99}
-FRONTS_ZP = {"ZENTRO":27.00}   # landing zentropilates US$27 (17/09/2026)
+FRONTS_ZP = {"ZENTRO":19.00}   # landing zentropilates US$19 (bajado de $27 el 18/09/2026)
 FRONT_NAMES = {"The Ultimate Knitting Library","LA BIBLIOTECA DEFINITIVA DE TEJIDO",
  "A Biblioteca Definitiva do Trico","La Biblioteca Definitiva del Tricot",
  "Die Ultimative Strickbibliothek","La Biblioteca Definitiva della Maglia"}
