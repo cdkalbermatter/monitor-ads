@@ -128,6 +128,12 @@ def meta_pause(ad_id):
             last = e   # sin permiso en esa cuenta: probar con el siguiente token
     raise last
 
+# ZENTRO SUSPENDIDO 23/09/2026: se esta probando el metodo de campana unica (1-1-X), que prohibe
+# pausar creativos mientras la campana agregada sea rentable ("teoria de la muleta"). La regla de
+# auto-pausa invalidaria el experimento. Para REACTIVAR: poner ZENTRO_SUSPENDIDO = False.
+ZENTRO_SUSPENDIDO = True
+
+
 def main():
     # Tejido (TELAS) + GeriActiva (comun LATAM, Argentina, Cognitiva, EN). Cada tablero por separado:
     # si Utmify falla en uno, el otro igual se procesa.
@@ -136,6 +142,9 @@ def main():
             ("TELAS", DASH, market, FRONTS, 50, 30),
             ("GERIACTIVA", DASH_GA, market_ga, FRONTS_GA, 10, 30),
             ("ZENTRO", DASH_ZP, market_zp, FRONTS_ZP, 1, 1)):
+        if label == "ZENTRO" and ZENTRO_SUSPENDIDO:
+            print("%s | ZENTRO | SUSPENDIDO: test del metodo de campana unica (1-1-X), no se pausan creativos"%TS)
+            continue
         # TELAS a nivel ad: sin nameContains Utmify devuelve error/vacio -> pedir por prefijos de nombre y unir
         adfilter = ([{"adObjectStatuses":["ACTIVE"],"nameContains":"AD TELAS"},{"adObjectStatuses":["ACTIVE"],"nameContains":"AD IMG"}]
                     if label == "TELAS" else [{"adObjectStatuses":["ACTIVE"]}])
