@@ -84,7 +84,18 @@ def sales_count(o):
     return int(o.get("approvedOrdersCount") or 0)
 
 def hidden_sales(o):
-    return sales_count(o)==0 and (num(o.get("revenue"))>0 or num(o.get("grossRevenue"))>0 or int(o.get("totalOrdersCount") or 0)>0)
+    """Venta REAL que Utmify todavia no aprobo: hay plata registrada. Eso si protege de pausar."""
+    return sales_count(o)==0 and (num(o.get("revenue"))>0 or num(o.get("grossRevenue"))>0)
+
+def unapproved_only(o):
+    """Ordenes que NO se cobraron (revenue 0): son intentos de compra rechazados o pendientes,
+    NO son ventas. En este negocio ~41% de las compras no se aprueban, asi que esto es comun.
+    FIX 23/09/2026: antes entraban en hidden_sales y le daban al ad INMUNIDAD ETERNA a la
+    auto-pausa (el cliente cazo '54-NUEVO-JUBILACION' gastando $25.74 con 0 ventas; habia 3 ads
+    asi, $60.52 tirados). Ahora no dan inmunidad: dan un gate al DOBLE, por si la orden se
+    aprueba tarde, pero el ad igual se apaga si sigue gastando."""
+    return (sales_count(o)==0 and num(o.get("revenue"))==0 and num(o.get("grossRevenue"))==0
+            and int(o.get("totalOrdersCount") or 0)>0)
 
 def is_profitable(o):
     return num(o.get("profit")) > 0
@@ -190,12 +201,14 @@ def run_dash(label, dash, resolver, fronts, mincamp, minads, adfilter=None):
         mkt, front = scope[cid]
         sp = (a.get("spend") or 0)/100.0
         n  = sales_count(a)
-        if hidden_sales(a): continue          # glitch Utmify: gasto sin ventas -> no tocar
+        if hidden_sales(a): continue          # hay revenue sin aprobar aun -> no tocar
         if is_profitable(a): continue         # rentable ahora -> JAMAS pausar
-        if sp < threshold(front, n): continue
+        gate = threshold(front, n)
+        if unapproved_only(a): gate *= 2      # ordenes no cobradas: margen, NO inmunidad
+        if sp < gate: continue
         try:
             if not DRY: meta_pause(a["id"])
-            paused.append((mkt, a.get("name"), round(sp,2), n, round(threshold(front,n),2)))
+            paused.append((mkt, a.get("name"), round(sp,2), n, round(gate,2)))
         except Exception as e:
             print("ERROR pausando %s: %s"%(a.get("name"), str(e)[:100]))
     print("%s | %s | %s=%d"%(TS, label, "SE PAUSARIAN" if DRY else "apagados", len(paused)))
